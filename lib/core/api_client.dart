@@ -5,11 +5,11 @@ class ApiClient {
   // Ganti IP ini sesuai perangkat pengujian Anda:
   // - Emulator Android Studio : 'http://10.0.2.2:8000/api'
   // - HP Fisik (Wi-Fi/LAN sama): 'http://127.0.0.1:8000/api'
-  static const String baseUrl = 'http://127.0.0.1:8000/api';
-  static const String storageBaseUrl = 'http://127.0.0.1:8000/api/file/';
+  // static const String baseUrl = 'http://127.0.0.1:8000/api';
+  // static const String storageBaseUrl = 'http://127.0.0.1:8000/api/file/';
 
-  // static const String baseUrl = 'https://api.ppmalajwah.my.id/api';
-  // static const String storageBaseUrl = 'https://api.ppmalajwah.my.id/api/file/';
+  static const String baseUrl = 'https://api.ppmalajwah.my.id/api';
+  static const String storageBaseUrl = 'https://api.ppmalajwah.my.id/api/file/';
 
   static final ApiClient _instance = ApiClient._internal();
   late final Dio dio;
