@@ -8,8 +8,8 @@ class ApiClient {
 //   static const String baseUrl = 'http://127.0.0.1:8000/api';
 //   static const String storageBaseUrl = 'http://127.0.0.1:8000/api/file/';
 
-  static const String baseUrl = 'http://192.168.110.168:8000/api';
-  static const String storageBaseUrl = 'http://192.168.110.168:8000/api/file/';
+  static const String baseUrl = 'https://api.ppmalajwah.my.id/api';
+  static const String storageBaseUrl = 'https://api.ppmalajwah.my.id/api/file/';
 
   static final ApiClient _instance = ApiClient._internal();
   late final Dio dio;
