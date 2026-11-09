@@ -21,7 +21,7 @@ class PpmAlAjwahApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       
       // Mengikuti pengaturan mode gelap/terang bawaan sistem HP secara otomatis
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.dark,
 
       // ================= TEMA TERANG (LIGHT THEME) =================
       theme: ThemeData(

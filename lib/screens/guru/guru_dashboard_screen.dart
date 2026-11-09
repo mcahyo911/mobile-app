@@ -879,8 +879,8 @@ class _GuruPresensiTabState extends State<_GuruPresensiTab> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Filter Rekap & Halaqah', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: onSurface)),
-                            Text('Sinkronisasi data sistem terpusat', style: TextStyle(fontSize: 10, color: onSurfaceVariant)),
+                            Text('Filter Rekap', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: onSurface)),
+                            Text('Silahkan pilih kategori untuk di filter', style: TextStyle(fontSize: 10, color: onSurfaceVariant)),
                           ],
                         ),
                       ],
@@ -1673,18 +1673,23 @@ class _GuruMateriTabState extends State<_GuruMateriTab> {
     }
   }
 
-  Future<void> _showCreateTargetModal() async {
-    String jenisMateri = 'alquran';
-    int? selectedSurahId = _masterAlquran.isNotEmpty ? _masterAlquran.first['id'] : 1;
-    int? selectedHaditsId = _masterHadits.isNotEmpty ? _masterHadits.first['id'] : null;
+  // Modal Terpadu untuk Tambah & Edit Target Materi
+  Future<void> _showTargetFormModal({Map<String, dynamic>? existingTarget}) async {
+    final bool isEdit = existingTarget != null;
+    String jenisMateri = existingTarget?['jenis_materi'] ?? 'alquran';
 
-    final ayatAwalCtrl = TextEditingController(text: '1');
-    final ayatAkhirCtrl = TextEditingController(text: '10');
-    final halAwalCtrl = TextEditingController(text: '1');
-    final barisAwalCtrl = TextEditingController(text: '1');
-    final halAkhirCtrl = TextEditingController(text: '2');
-    final barisAkhirCtrl = TextEditingController(text: '15');
-    final catatanCtrl = TextEditingController();
+    int? selectedSurahId = existingTarget?['surah_id'] ??
+        (_masterAlquran.isNotEmpty ? _masterAlquran.first['id'] : 1);
+    int? selectedHaditsId = existingTarget?['hadits_id'] ??
+        (_masterHadits.isNotEmpty ? _masterHadits.first['id'] : null);
+
+    final ayatAwalCtrl = TextEditingController(text: existingTarget?['ayat_awal']?.toString() ?? '1');
+    final ayatAkhirCtrl = TextEditingController(text: existingTarget?['ayat_akhir']?.toString() ?? '10');
+    final halAwalCtrl = TextEditingController(text: existingTarget?['halaman_awal']?.toString() ?? '1');
+    final barisAwalCtrl = TextEditingController(text: existingTarget?['baris_awal']?.toString() ?? '1');
+    final halAkhirCtrl = TextEditingController(text: existingTarget?['halaman_akhir']?.toString() ?? '2');
+    final barisAkhirCtrl = TextEditingController(text: existingTarget?['baris_akhir']?.toString() ?? '15');
+    final catatanCtrl = TextEditingController(text: existingTarget?['catatan_materi'] ?? '');
     bool isSubmitting = false;
 
     await showModalBottomSheet(
@@ -1705,7 +1710,10 @@ class _GuruMateriTabState extends State<_GuruMateriTab> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text('Buat Target Materi Harian', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Text(
+                    isEdit ? 'Ubah Target Materi Harian' : 'Buat Target Materi Harian',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 12),
                   SegmentedButton<String>(
                     segments: const [
@@ -1825,7 +1833,7 @@ class _GuruMateriTabState extends State<_GuruMateriTab> {
                             setStateModal(() => isSubmitting = true);
                             try {
                               final payload = <String, dynamic>{
-                                'tanggal': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+                                'tanggal': existingTarget?['tanggal'] ?? DateFormat('yyyy-MM-dd').format(DateTime.now()),
                                 'jenis_materi': jenisMateri,
                                 'catatan_materi': catatanCtrl.text.trim(),
                               };
@@ -1840,17 +1848,29 @@ class _GuruMateriTabState extends State<_GuruMateriTab> {
                                 payload['halaman_akhir'] = int.tryParse(halAkhirCtrl.text.trim());
                                 payload['baris_akhir'] = int.tryParse(barisAkhirCtrl.text.trim());
                               }
-                              await _apiClient.dio.post('/materi/target', data: payload);
+
+                              if (isEdit) {
+                                await _apiClient.dio.put('/materi/target/${existingTarget['id']}', data: payload);
+                              } else {
+                                await _apiClient.dio.post('/materi/target', data: payload);
+                              }
+
                               if (!mounted) return;
                               Navigator.pop(ctx);
                               _loadData();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(isEdit ? 'Target berhasil diperbarui' : 'Target berhasil dibuat')),
+                              );
                             } catch (e) {
                               setStateModal(() => isSubmitting = false);
                               if (!mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ApiClient.getErrorMessage(e))));
                             }
                           },
-                    child: const Text('SIMPAN TARGET MATERI', style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: Text(
+                      isEdit ? 'SIMPAN PERUBAHAN' : 'SIMPAN TARGET MATERI',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ],
               ),
@@ -1859,6 +1879,40 @@ class _GuruMateriTabState extends State<_GuruMateriTab> {
         },
       ),
     );
+  }
+
+  // Dialog Konfirmasi Hapus Target
+  Future<void> _confirmDeleteTarget(Map<String, dynamic> target, String judul) async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hapus Target Materi?'),
+        content: Text('Target "$judul" beserta seluruh riwayat setorannya akan dihapus permanen.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await _apiClient.dio.delete('/materi/target/${target['id']}');
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Target berhasil dihapus')));
+        _loadData();
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ApiClient.getErrorMessage(e))));
+      }
+    }
   }
 
   @override
@@ -1880,7 +1934,7 @@ class _GuruMateriTabState extends State<_GuruMateriTab> {
         heroTag: 'fab_guru_materi',
         backgroundColor: primaryContainer,
         foregroundColor: Colors.white,
-        onPressed: _showCreateTargetModal,
+        onPressed: () => _showTargetFormModal(),
         icon: const Icon(Icons.add_task_rounded),
         label: const Text('Tambah Target', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
@@ -1921,19 +1975,64 @@ class _GuruMateriTabState extends State<_GuruMateriTab> {
                             ),
                             const SizedBox(width: 10),
                             Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    judul,
-                                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: onSurface),
-                                  ),
-                                  Text(
-                                    jenis == 'alquran' ? 'Target Al-Qur\'an' : 'Target Hadits Himpunan',
-                                    style: const TextStyle(fontSize: 11, color: secondaryGold, fontWeight: FontWeight.w600),
-                                  ),
-                                ],
+                              child: InkWell(
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => _ValidasiProgresSantriScreen(
+                                        targetId: t['id'],
+                                        judulMateri: judul,
+                                      ),
+                                    ),
+                                  ).then((_) => _loadData());
+                                },
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      judul,
+                                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: onSurface),
+                                    ),
+                                    Text(
+                                      jenis == 'alquran' ? 'Target Al-Qur\'an' : 'Target Hadits Himpunan',
+                                      style: const TextStyle(fontSize: 11, color: secondaryGold, fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
                               ),
+                            ),
+                            // Menu Opsi Edit & Hapus
+                            PopupMenuButton<String>(
+                              icon: const Icon(Icons.more_vert),
+                              onSelected: (value) {
+                                if (value == 'edit') {
+                                  _showTargetFormModal(existingTarget: t);
+                                } else if (value == 'delete') {
+                                  _confirmDeleteTarget(t, judul);
+                                }
+                              },
+                              itemBuilder: (ctx) => [
+                                const PopupMenuItem(
+                                  value: 'edit',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.edit_outlined, size: 20),
+                                      SizedBox(width: 8),
+                                      Text('Ubah Target'),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                                      SizedBox(width: 8),
+                                      Text('Hapus Target', style: TextStyle(color: Colors.redAccent)),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                             IconButton(
                               icon: const Icon(Icons.chevron_right),

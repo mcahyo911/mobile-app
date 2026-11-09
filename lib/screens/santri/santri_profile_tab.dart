@@ -26,6 +26,14 @@ class _SantriProfileTabState extends State<SantriProfileTab> {
   File? _newFotoProfilWebp;
   String? _existingFotoPath;
 
+  // Controller Kredensial Akun
+  late final TextEditingController _usernameCtrl;
+  late final TextEditingController _currentPasswordCtrl;
+  late final TextEditingController _newPasswordCtrl;
+  bool _obscureCurrentPassword = true;
+  bool _obscureNewPassword = true;
+
+  // Controller Biodata Santri
   late final TextEditingController _namaLengkapCtrl;
   late final TextEditingController _namaPanggilanCtrl;
   late final TextEditingController _kamarCtrl;
@@ -71,6 +79,12 @@ class _SantriProfileTabState extends State<SantriProfileTab> {
     _jenisKelamin = p['jenis_kelamin'] ?? 'L';
     _statusMubaligh = p['status_mubaligh'] ?? 'belum';
 
+    // Kredensial Akun
+    _usernameCtrl = TextEditingController(text: widget.user['username'] ?? '');
+    _currentPasswordCtrl = TextEditingController();
+    _newPasswordCtrl = TextEditingController();
+
+    // Biodata
     _namaLengkapCtrl = TextEditingController(text: p['nama_lengkap'] ?? '');
     _namaPanggilanCtrl = TextEditingController(text: p['nama_panggilan'] ?? '');
     _kamarCtrl = TextEditingController(text: p['kamar'] ?? '');
@@ -81,7 +95,6 @@ class _SantriProfileTabState extends State<SantriProfileTab> {
     _asalProvinsiCtrl = TextEditingController(text: p['asal_provinsi'] ?? '');
     _asalKotaKabCtrl = TextEditingController(text: p['asal_kota_kab'] ?? '');
 
-    // Ekstrak Daerah, Desa, Kelompok dari asal_tempat_sambung
     final String rawSambung = p['asal_tempat_sambung'] ?? '';
     String daerah = '', desa = '', kelompok = '';
     if (rawSambung.contains('|')) {
@@ -109,6 +122,9 @@ class _SantriProfileTabState extends State<SantriProfileTab> {
 
   @override
   void dispose() {
+    _usernameCtrl.dispose();
+    _currentPasswordCtrl.dispose();
+    _newPasswordCtrl.dispose();
     _namaLengkapCtrl.dispose();
     _namaPanggilanCtrl.dispose();
     _kamarCtrl.dispose();
@@ -139,6 +155,7 @@ class _SantriProfileTabState extends State<SantriProfileTab> {
           'Daerah: ${_asalDaerahCtrl.text.trim()} | Desa: ${_asalDesaCtrl.text.trim()} | Kelompok: ${_asalKelompokCtrl.text.trim()}';
 
       final Map<String, dynamic> payload = {
+        'username': _usernameCtrl.text.trim(),
         'nama_lengkap': _namaLengkapCtrl.text.trim(),
         'nama_panggilan': _namaPanggilanCtrl.text.trim(),
         'jenis_kelamin': _jenisKelamin,
@@ -157,6 +174,12 @@ class _SantriProfileTabState extends State<SantriProfileTab> {
         'prodi': _prodiCtrl.text.trim(),
         'beasiswa': _beasiswaCtrl.text.trim(),
       };
+
+      // Sertakan pergantian kata sandi jika diisi
+      if (_newPasswordCtrl.text.trim().isNotEmpty) {
+        payload['current_password'] = _currentPasswordCtrl.text;
+        payload['new_password'] = _newPasswordCtrl.text;
+      }
 
       if (_angkatanCtrl.text.trim().length == 4) {
         payload['angkatan_kuliah'] = int.tryParse(_angkatanCtrl.text.trim());
@@ -178,13 +201,21 @@ class _SantriProfileTabState extends State<SantriProfileTab> {
       setState(() {
         _existingFotoPath = updatedProfile['foto_profil_webp'];
         _newFotoProfilWebp = null;
+        _currentPasswordCtrl.clear();
+        _newPasswordCtrl.clear();
       });
-      widget.onProfileUpdated(updatedProfile);
+
+      // Berikan data terbaru ke callback parent
+      if (res.data['user'] != null) {
+        widget.onProfileUpdated(Map<String, dynamic>.from(res.data['user']));
+      } else {
+        widget.onProfileUpdated(updatedProfile);
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(res.data['message'] ?? 'Profil berhasil diperbarui!'),
+          content: Text(res.data['message'] ?? 'Profil & Akun berhasil diperbarui!'),
           backgroundColor: Colors.teal.shade700,
         ),
       );
@@ -385,6 +416,88 @@ class _SantriProfileTabState extends State<SantriProfileTab> {
                 ),
               ),
               const SizedBox(height: 20),
+
+              // Card 0: Kredensial & Keamanan Akun
+              _buildSectionCard(
+                stepNumber: '🔒',
+                icon: Icons.shield_outlined,
+                title: 'Kredensial & Keamanan Akun',
+                children: [
+                  _buildTextField(
+                    _usernameCtrl,
+                    'Username Login',
+                    required: true,
+                    prefixIcon: Icons.alternate_email,
+                    prefixIconColor: colorPrimary,
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'UBAH KATA SANDI (KOSONGKAN JIKA TIDAK INGIN MENGGANTI)',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: colorSecondary,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: TextFormField(
+                      controller: _currentPasswordCtrl,
+                      obscureText: _obscureCurrentPassword,
+                      style: const TextStyle(fontSize: 14, color: colorOnSurface),
+                      decoration: _inputDecoration(
+                        'Kata Sandi Saat Ini',
+                        prefixIcon: Icons.lock_outline,
+                        prefixIconColor: colorSecondary,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscureCurrentPassword ? Icons.visibility_off : Icons.visibility,
+                            size: 18,
+                            color: colorOnSurfaceVariant,
+                          ),
+                          onPressed: () => setState(() => _obscureCurrentPassword = !_obscureCurrentPassword),
+                        ),
+                      ),
+                      validator: (val) {
+                        if (_newPasswordCtrl.text.isNotEmpty && (val == null || val.isEmpty)) {
+                          return 'Masukkan kata sandi saat ini untuk konfirmasi';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: TextFormField(
+                      controller: _newPasswordCtrl,
+                      obscureText: _obscureNewPassword,
+                      style: const TextStyle(fontSize: 14, color: colorOnSurface),
+                      decoration: _inputDecoration(
+                        'Kata Sandi Baru (Min. 6 Karakter)',
+                        prefixIcon: Icons.lock_reset,
+                        prefixIconColor: colorPrimary,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscureNewPassword ? Icons.visibility_off : Icons.visibility,
+                            size: 18,
+                            color: colorOnSurfaceVariant,
+                          ),
+                          onPressed: () => setState(() => _obscureNewPassword = !_obscureNewPassword),
+                        ),
+                      ),
+                      validator: (val) {
+                        if (val != null && val.isNotEmpty && val.length < 6) {
+                          return 'Kata sandi baru minimal 6 karakter';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
 
               // Card 1
               _buildSectionCard(
@@ -692,6 +805,7 @@ class _SantriProfileTabState extends State<SantriProfileTab> {
     String label, {
     IconData? prefixIcon,
     Color? prefixIconColor,
+    Widget? suffixIcon,
   }) {
     return InputDecoration(
       filled: true,
@@ -701,6 +815,7 @@ class _SantriProfileTabState extends State<SantriProfileTab> {
       prefixIcon: prefixIcon != null
           ? Icon(prefixIcon, size: 18, color: prefixIconColor ?? colorPrimary)
           : null,
+      suffixIcon: suffixIcon,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
